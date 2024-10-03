@@ -1,23 +1,91 @@
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
 
 buildscript {
+    ext.kotlinVersion = '1.4.0'
+    ext.koinVersion = '2.0.1'
+    ext.espressoVersion = '3.2.0'
+    ext.dokkaVersion = '0.10.1'
+
     repositories {
-        jcenter()
+        google()
+        mavenCentral() // Use mavenCentral instead of deprecated jcenter
+        maven { url 'https://jitpack.io' }
+        maven { url "https://oss.sonatype.org/content/repositories/snapshots/" }
+        maven { url 'https://plugins.gradle.org/m2/' }
     }
+
     dependencies {
-//        classpath 'com.android.tools.build:gradle:2.3.1'
-        classpath 'com.android.tools.build:gradle:2.3.0+'
-        classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.7.3'
-        classpath 'com.github.dcendents:android-maven-gradle-plugin:1.5'
+        classpath 'com.android.tools.build:gradle:4.2.2' // Ensure compatibility with Gradle version
+        classpath "io.codearte.gradle.nexus:gradle-nexus-staging-plugin:0.11.0"
+        classpath 'gradle.plugin.org.kt3k.gradle.plugin:coveralls-gradle-plugin:2.10.1'
+        classpath 'com.google.gms:google-services:4.3.15'
+        classpath 'org.smartregister:gradle-jarjar-plugin:1.0.0-SNAPSHOT'
     }
 }
 
+apply plugin: 'com.github.kt3k.coveralls'
+apply plugin: 'jacoco'
+apply plugin: 'io.codearte.nexus-staging'
+
 allprojects {
     repositories {
-        jcenter()
+        google()
+        mavenCentral() // Use mavenCentral instead of redundant URLs
+        maven { url 'https://jitpack.io' }
+        maven { url 'https://oss.sonatype.org/content/repositories/snapshots/' }
+        mavenLocal()
+    }
+}
+
+// Define common properties
+ext {
+    VERSION_NAME = '1.0.0'  // Ensure these variables are defined
+    GROUP = 'org.smartregister'
+}
+
+configure(allprojects) { project ->
+    version = VERSION_NAME
+    group = GROUP
+
+    buildscript {
+        repositories {
+            google()
+            mavenCentral()
+            maven { url 'https://oss.sonatype.org/content/repositories/snapshots/' }
+            maven { url 'https://plugins.gradle.org/m2/' }
+        }
+    }
+}
+
+project.ext.preDexLibs = !project.hasProperty('disablePreDex')
+
+subprojects {
+    group = 'org.smartregister'
+
+    ext.androidToolsBuildGradle     = '4.2.2'
+    ext.androidBuildToolsVersion    = '28.0.2'
+    ext.androidMinSdkVersion        = 21
+    ext.androidCompileSdkVersion    = 34
+    ext.androidTargetSdkVersion     = 34
+
+    ext.androidAnnotationsVersion = '3.0.1'
+    ext.androidAnnotationsAPIVersion = '3.0.1'
+
+    project.plugins.whenPluginAdded { plugin ->
+        if ("com.android.build.gradle.AppPlugin".equals(plugin.class.name) ||
+                "com.android.build.gradle.LibraryPlugin".equals(plugin.class.name)) {
+
+            project.android.buildTypes.each { buildType ->
+                buildType.minifyEnabled = false // Set this to true if R8 or Proguard is intended
+            }
+        }
     }
 }
 
 task clean(type: Delete) {
     delete rootProject.buildDir
+}
+
+def isReleaseBuild() {
+    return version.contains("SNAPSHOT") == false
 }

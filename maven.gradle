@@ -131,9 +131,4 @@ afterEvaluate { project ->
         archives androidSourcesJar
         archives androidJavadocsJar
     }
-
-    nexusStaging {
-        username getRepositoryUsername()
-        password getRepositoryPassword()
-    }
 }

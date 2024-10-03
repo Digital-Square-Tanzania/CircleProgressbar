@@ -1,81 +1,144 @@
+buildscript {
+    repositories {
+        google()
+        mavenCentral() // Replaced deprecated jcenter() with mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:4.2.2'
+        classpath 'org.apache.commons:commons-lang3:3.3.2'
+        classpath 'com.google.gms:google-services:4.3.3'
+        classpath 'com.google.firebase:firebase-crashlytics-gradle:2.3.0'
+    }
+}
+
 apply plugin: 'com.android.library'
-apply plugin: 'com.github.dcendents.android-maven' // maven repository e eklememiz için gerekli gradle plugin
-apply plugin: "com.jfrog.bintray" // bintray yapılandırması yapmamız için gerekli gradle plugin
-// Kodların devamında göreceğiniz hazır yazılmış gradle tasklerini getiren yapıda, güncellenmesi gereken yerleri
-// bu şekilde düzenliyoruz.
+apply plugin: 'jacoco'
+apply plugin: 'com.github.kt3k.coveralls'
+apply plugin: 'maven-publish'
+
+jacoco {
+    toolVersion = "0.8.5"
+}
+
+def githubProperties = new Properties()
+if (rootProject.file("github.properties").exists()) {
+    githubProperties.load(new FileInputStream(rootProject.file("github.properties")))
+}
+
 ext {
     PUBLISH_GROUP_ID = 'com.emredavarci'
     PUBLISH_ARTIFACT_ID = 'circleprogressbar'
-    PUBLISH_VERSION = '1.0.4'
+    PUBLISH_VERSION = '1.0.8-LOCAL-ALPHA'
 }
 
-
 android {
-    compileSdkVersion 26
-    buildToolsVersion "26.0.0"
+    compileSdkVersion 34
+    buildToolsVersion "28.0.2" // Updated to latest stable build tools version
     defaultConfig {
-        minSdkVersion 16
-        targetSdkVersion 26
+        minSdkVersion 21
+        targetSdkVersion 34
         versionCode 1
         versionName "1.0"
-        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner" // Use androidx test runner
     }
     buildTypes {
         release {
             minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
+    }
+
+    lintOptions {
+        checkReleaseBuilds false
     }
 }
 
 dependencies {
-    compile fileTree(dir: 'libs', include: ['*.jar'])
-    androidTestCompile('com.android.support.test.espresso:espresso-core:2.2.2', {
+    def appcompat_version = "1.2.0"
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+
+    // Updated test dependencies to use androidx
+    androidTestImplementation('androidx.test.espresso:espresso-core:3.4.0') {
         exclude group: 'com.android.support', module: 'support-annotations'
-    })
-    compile 'com.android.support:appcompat-v7:26.+'
-    compile 'com.android.support.constraint:constraint-layout:1.0.2'
-    testCompile 'junit:junit:4.12'
+    }
+
+    implementation "androidx.appcompat:appcompat:$appcompat_version"
+    implementation 'androidx.core:core:1.10.1'                 // Core AndroidX library for Java
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4' // ConstraintLayout for layouts
+    implementation 'com.google.android.material:material:1.6.0'  // Use the latest material version
+    implementation "androidx.appcompat:appcompat-resources:$appcompat_version"
+    testImplementation 'junit:junit:4.13.2'
 }
 
-// Aşağıda ki linke girip bakarsanız aslında gradle task yazılmış olduğunu görürsünüz. Bu yazılan task ler ile
-// oluşturmuş olduğumuz module dosyalarından gerekli dosyalara dönüşümlerini sağlıyoruz.
-apply from: 'https://raw.githubusercontent.com/blundell/release-android-library/master/android-release-aar.gradle'
+tasks.withType(Test) {
+    jacoco.includeNoLocationClasses = true
+    testLogging {
+        exceptionFormat = 'full'
+    }
+    maxHeapSize = "2g"
+}
 
-def siteUrl = 'https://github.com/emre1512/CricleProgressBar'      // Homepage URL of the library
-def gitUrl = 'https://github.com/emre1512/CricleProgressBar.git'  // Git repository URL
-group = "com.emredavarci"
-
-install {
-    repositories.mavenInstaller {
-        pom {
-            project {
-                packaging 'aar'
-
-                name 'com.emredavarci:circleprogressbar' // TODO
-                description = 'Circle ProgressBar' // TODO
-                url siteUrl
-
-                // Set your license
-                licenses {
-                    license {
-                        name 'The Apache Software License, Version 2.0'
-                        url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
-                    }
-                }
-                developers {
-                    developer {
-                        id 'emre1512' // TODO
-                        name 'M. Emre Davarci' // TODO
-                        email 'emre151291@gmail.com' // TODO
-                    }
-                }
-                scm {
-                    connection gitUrl
-                    developerConnection gitUrl
-                    url siteUrl
-                }
+task copyTestResources {
+    def path = "${buildDir}/intermediates/classes/test"
+    def paths = ["${path}/debug", "${path}/release"]
+    doLast {
+        paths.each { dest ->
+            copy {
+                from "${projectDir}/src/test/resources"
+                into dest
             }
         }
     }
 }
+
+afterEvaluate {
+    assembleDebug.dependsOn(copyTestResources)
+}
+
+configurations.all {
+    resolutionStrategy.force 'commons-codec:commons-codec:1.10'
+}
+
+def getVersionName = { -> return ext.PUBLISH_VERSION }
+def getArtifactId = { -> return ext.PUBLISH_ARTIFACT_ID }
+
+def siteUrl = 'https://github.com/emre1512/CircleProgressBar'
+def gitUrl = 'https://github.com/emre1512/CircleProgressBar.git'
+group = PUBLISH_GROUP_ID
+
+publishing {
+    repositories {
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/Digital-Square-Tanzania/opensrp-client-core")
+            credentials {
+                username = githubProperties['gpr.usr'] ?: System.getenv("GPR_USER")
+                password = githubProperties['gpr.key'] ?: System.getenv("GPR_API_KEY")
+            }
+        }
+    }
+
+    publications {
+        bar(MavenPublication) {
+            groupId PUBLISH_GROUP_ID
+            artifactId getArtifactId()
+            version getVersionName()
+            artifact("$buildDir/outputs/aar/${getArtifactId()}-debug.aar")
+
+            pom.withXml {
+                final dependenciesNode = asNode().appendNode('dependencies')
+                ext.addDependency = { Dependency dep, String scope ->
+                    if (dep.group == null || dep.version == null || dep.name == null || dep.name == 'unspecified') return
+                    final dependencyNode = dependenciesNode.appendNode('dependency')
+                    dependencyNode.appendNode('groupId', dep.group)
+                    dependencyNode.appendNode('artifactId', dep.name)
+                    dependencyNode.appendNode('version', dep.version)
+                    dependencyNode.appendNode('scope', scope)
+                }
+                configurations.implementation.getDependencies().each { dep -> addDependency(dep, 'compile') }
+            }
+        }
+    }
+}
+
+apply from: '../maven.gradle'
