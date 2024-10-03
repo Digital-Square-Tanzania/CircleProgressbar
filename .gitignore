@@ -11,3 +11,5 @@ app/src/main/res/layout/
 /build
 /captures
 .externalNativeBuild
+github.properties
+.idea
