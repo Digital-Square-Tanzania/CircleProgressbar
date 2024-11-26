@@ -110,7 +110,7 @@ publishing {
     repositories {
         maven {
             name = "GitHubPackages"
-            url = uri("https://maven.pkg.github.com/Digital-Square-Tanzania/opensrp-client-core")
+            url = uri("https://maven.pkg.github.com/Digital-Square-Tanzania/CircleProgressbar")
             credentials {
                 username = githubProperties['gpr.usr'] ?: System.getenv("GPR_USER")
                 password = githubProperties['gpr.key'] ?: System.getenv("GPR_API_KEY")
@@ -123,7 +123,7 @@ publishing {
             groupId PUBLISH_GROUP_ID
             artifactId getArtifactId()
             version getVersionName()
-            artifact("$buildDir/outputs/aar/${getArtifactId()}-debug.aar")
+            artifact("$buildDir/outputs/aar/app-release.aar")
 
             pom.withXml {
                 final dependenciesNode = asNode().appendNode('dependencies')
